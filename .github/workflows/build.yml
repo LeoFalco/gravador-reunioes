@@ -1,0 +1,69 @@
+name: build
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - run: npm run dist
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+
+      # Fumaça: grava de verdade com o app empacotado. No Mac o runner não concede a permissão de
+      # Gravação de Tela, então lá só se confere o build.
+      - name: Fumaça no Linux
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq xvfb pulseaudio ffmpeg
+          pulseaudio --start --exit-idle-time=-1
+          pactl load-module module-null-sink sink_name=reuniao
+          pactl set-default-sink reuniao
+          (ffmpeg -loglevel error -re -f lavfi -i sine=frequency=440:duration=60 -f pulse default &)
+          xvfb-run -a -s "-screen 0 1280x720x24" node scripts/fumaca.js dist/linux-unpacked/gravador-reunioes --no-sandbox
+      - name: Fumaça no Windows
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          choco install ffmpeg -y --no-progress > /dev/null
+          export PATH="$PATH:/c/ProgramData/chocolatey/bin"
+          node scripts/fumaca.js "dist/win-unpacked/Gravador de Reunioes.exe"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ runner.os }}
+          path: |
+            dist/*.zip
+            dist/*.exe
+            dist/*.AppImage
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          merge-multiple: true
+      - run: gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --generate-notes *
+        env:
+          GH_TOKEN: ${{ github.token }}

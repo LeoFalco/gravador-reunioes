@@ -1,0 +1,74 @@
+{
+  "name": "gravador-reunioes",
+  "version": "0.1.0",
+  "description": "Grava a tela com o áudio da reunião e o microfone, pela bandeja e por atalho.",
+  "main": "src/main.js",
+  "scripts": {
+    "start": "electron .",
+    "test": "node --test test/*.test.js",
+    "dist": "electron-builder --publish never"
+  },
+  "author": "Leonardo Falco",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^45.5.0",
+    "electron-builder": "^26.18.0"
+  },
+  "productName": "Gravador de Reunioes",
+  "//": "productName sem acento: no Mac o pacote grava o nome em NFD e o Electron não acha os helpers (crash ao abrir).",
+  "build": {
+    "appId": "br.leofalco.gravadorreunioes",
+    "files": [
+      "src/**",
+      "icone.png"
+    ],
+    "icon": "icone.png",
+    "artifactName": "gravador-reunioes-${os}-${arch}.${ext}",
+    "mac": {
+      "target": [
+        {
+          "target": "zip",
+          "arch": [
+            "arm64",
+            "x64"
+          ]
+        }
+      ],
+      "category": "public.app-category.productivity",
+      "identity": null,
+      "extendInfo": {
+        "NSAudioCaptureUsageDescription": "Para gravar o áudio da reunião.",
+        "NSMicrophoneUsageDescription": "Para gravar a sua voz na reunião.",
+        "NSScreenCaptureUsageDescription": "Para gravar a tela.",
+        "LSUIElement": true,
+        "CFBundleDisplayName": "Gravador de Reuniões"
+      }
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "shortcutName": "Gravador de Reuniões"
+    },
+    "linux": {
+      "target": [
+        {
+          "target": "AppImage",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "category": "AudioVideo"
+    }
+  }
+}
