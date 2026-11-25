@@ -36,9 +36,10 @@ por script ou por outro atalho.
 ### Permissões e limites por sistema
 
 - **macOS** (13 ou mais novo): na primeira gravação o sistema pede **Gravação de Tela** e
-  **Microfone**. Se a gravação não começar, libere o app em Ajustes do Sistema → Privacidade e
-  Segurança e abra de novo. O app não é assinado pela Apple; o instalador assina localmente, e por
-  isso cada atualização pode pedir a permissão outra vez.
+  **Microfone**. O app não é assinado pela Apple; o instalador assina localmente, e por isso **cada
+  atualização revoga a Gravação de Tela sem pedir de novo**. Quando isso acontece, o app avisa e abre
+  Ajustes do Sistema → Privacidade e Segurança → Gravação de Tela: desligue e ligue o Gravador de
+  Reuniões (ou adicione-o, se não estiver na lista) e abra o app outra vez.
 - **Windows**: nada a configurar.
 - **Linux**: o áudio do sistema vem da saída padrão do PulseAudio ou do PipeWire. Em Wayland o sistema
   mostra o seletor de tela a cada gravação, e o atalho global depende do portal do ambiente; se ele

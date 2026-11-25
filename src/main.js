@@ -46,12 +46,12 @@ function iniciar() {
     session.defaultSession.setDisplayMediaRequestHandler(async (_req, callback) => {
       try {
         const [tela] = await desktopCapturer.getSources({ types: ['screen'] });
-        if (!tela) return callback({});
+        if (!tela) return callback(null);
         // No Linux o loopback do Chromium lê o monitor da saída padrão do PulseAudio/PipeWire.
         callback({ video: tela, audio: 'loopback' });
       } catch (e) {
-        console.error('Sem acesso à tela:', e.message);
-        callback({});
+        console.error('Sem acesso à tela:', e?.message ?? e);
+        callback(null);
       }
     });
     session.defaultSession.setPermissionRequestHandler((_wc, _perm, ok) => ok(true));
@@ -102,7 +102,15 @@ ipcMain.on('pedaco', (_e, dados) => arquivo?.write(Buffer.from(dados)));
 
 ipcMain.on('terminou', () => fechar((salvo) => avisar(`Gravação salva em ${salvo}`, salvo)));
 
-ipcMain.on('falhou', (_e, msg) => fechar(() => avisar(`Não deu para gravar: ${msg}`)));
+ipcMain.on('falhou', (_e, msg) => fechar(() => {
+  // No Mac quase sempre é a permissão: o app é assinado localmente, e cada atualização a revoga sem novo pedido.
+  if (process.platform === 'darwin' && systemPreferences.getMediaAccessStatus('screen') !== 'granted') {
+    avisar('Libere o Gravador de Reuniões em Gravação de Tela (se já estiver na lista, desligue e ligue de novo) e abra o app outra vez.');
+    shell.openExternal('x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture');
+    return;
+  }
+  avisar(`Não deu para gravar: ${msg}`);
+}));
 
 function fechar(depois) {
   const salvo = caminhoAtual;
