@@ -23,11 +23,11 @@ O mesmo comando atualiza para a última versão.
 
 | Ação | Como |
 | --- | --- |
-| Começar e parar | **Ctrl+Shift+9** (no Mac, **⌘+Shift+9**) ou clique no ícone da bandeja |
+| Começar e parar | **Ctrl+Shift+9** (no Mac, **⌘+Shift+9**), clique no ícone da bandeja (Windows e Linux) ou menu do ícone → **Gravar tela** |
 | Achar as gravações | Menu da bandeja → **Abrir pasta das gravações** (`Filmes/Reuniões` no Mac, `Vídeos/Reuniões` nos outros) |
-| Abrir junto com o sistema | Menu da bandeja → **Iniciar com o sistema** |
+| Abrir junto com o sistema | Menu da bandeja → **Iniciar com o sistema** (macOS e Windows) |
 
-O ícone fica vermelho enquanto grava. O vídeo vai sendo gravado no disco a cada segundo: se o
+O ícone fica vermelho enquanto grava. Sair pelo menu no meio de uma gravação fecha o arquivo antes. O vídeo vai sendo gravado no disco a cada segundo: se o
 computador cair no meio da reunião, o que já foi gravado fica no arquivo.
 
 Rodar o app de novo com `--alternar` também liga e desliga a gravação, para quem quiser disparar
@@ -41,7 +41,9 @@ por script ou por outro atalho.
   isso cada atualização pode pedir a permissão outra vez.
 - **Windows**: nada a configurar.
 - **Linux**: o áudio do sistema vem do "Monitor" do PulseAudio ou PipeWire. Em Wayland o sistema
-  mostra o seletor de tela a cada gravação. O AppImage precisa do `libfuse2`.
+  mostra o seletor de tela a cada gravação, e o atalho global depende do portal do ambiente; se ele
+  não pegar, crie um atalho do sistema que rode `~/.local/bin/gravador-reunioes.AppImage --alternar`.
+  O AppImage precisa do `libfuse2` (`libfuse2t64` no Ubuntu 24.04).
 
 ## Desenvolver
 

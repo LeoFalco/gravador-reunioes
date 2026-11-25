@@ -7,7 +7,7 @@ on:
   pull_request:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   build:
@@ -38,8 +38,11 @@ jobs:
           pulseaudio --start --exit-idle-time=-1
           pactl load-module module-null-sink sink_name=reuniao
           pactl set-default-sink reuniao
+          export PULSE_SERVER="$(pactl info | sed -n 's/^Server String: //p')"
+          pactl info | grep -E "Server String|Default"
+          pactl list short sources
           (ffmpeg -loglevel error -re -f lavfi -i sine=frequency=440:duration=60 -f pulse default &)
-          xvfb-run -a -s "-screen 0 1280x720x24" node scripts/fumaca.js dist/linux-unpacked/gravador-reunioes --no-sandbox
+          EXIGIR_AUDIO=1 xvfb-run -a -s "-screen 0 1280x720x24" node scripts/fumaca.js dist/linux-unpacked/gravador-reunioes --no-sandbox
       - name: Fumaça no Windows
         if: runner.os == 'Windows'
         shell: bash
@@ -60,10 +63,16 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/v')
     needs: build
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
+      - uses: actions/checkout@v4
+      - name: Tag bate com a versão do package.json
+        run: test "v$(node -p 'require("./package.json").version')" = "$GITHUB_REF_NAME"
       - uses: actions/download-artifact@v4
         with:
+          path: pacotes
           merge-multiple: true
-      - run: gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --generate-notes *
+      - run: gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --generate-notes pacotes/*
         env:
           GH_TOKEN: ${{ github.token }}

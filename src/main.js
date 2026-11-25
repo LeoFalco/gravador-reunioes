@@ -6,82 +6,129 @@ const { nomeDoArquivo, extensaoDoMime } = require('./nome');
 const ATALHO = 'CommandOrControl+Shift+9';
 const pasta = path.join(app.getPath('videos'), 'Reuniões');
 
-let tray, janela, arquivo, caminhoAtual;
-let gravando = false;
+// parado → iniciando → gravando → parando → parado. O "iniciando" e o "parando" absorvem o segundo toque
+// no atalho enquanto a captura abre ou fecha; sem eles nasciam dois gravadores no mesmo arquivo.
+let estado = 'parado';
+let tray, janela, arquivo, caminhoAtual, saindo = false;
 
-if (!app.requestSingleInstanceLock()) app.quit();
-// Rodar o app de novo com --alternar liga ou desliga a gravação (útil em script e atalho do sistema).
-app.on('second-instance', (_e, argv) => { if (argv.includes('--alternar')) alternar(); });
+if (process.platform === 'linux') {
+  // Atalho global no Wayland só pelo portal.
+  app.commandLine.appendSwitch('enable-features', 'GlobalShortcutsPortal');
+  // Ubuntu 24.04+ barra o sandbox SUID do AppImage pelo AppArmor, e o app nem abre.
+  if (process.env.APPIMAGE) app.commandLine.appendSwitch('no-sandbox');
+}
 
-if (process.platform === 'darwin') app.dock?.hide();
+if (!app.requestSingleInstanceLock()) {
+  // Segunda instância (ex.: --alternar): o pedido já foi entregue à primeira pelo second-instance.
+  app.exit(0);
+} else {
+  iniciar();
+}
 
-app.whenReady().then(async () => {
-  fs.mkdirSync(pasta, { recursive: true });
-
-  // A captura vai sem seletor: a tela principal inteira, com o áudio do sistema por loopback.
-  session.defaultSession.setDisplayMediaRequestHandler(async (_req, callback) => {
-    const [tela] = await desktopCapturer.getSources({ types: ['screen'] });
-    // Loopback só existe no Windows e no Mac; no Linux o áudio do sistema vem do monitor (ver gravador.js).
-    callback(process.platform === 'linux' ? { video: tela } : { video: tela, audio: 'loopback' });
+function iniciar() {
+  // Rodar o app de novo com --alternar liga ou desliga a gravação (útil em script e atalho do sistema).
+  app.on('second-instance', (_e, argv) => { if (argv.includes('--alternar')) alternar(); });
+  app.on('will-quit', () => globalShortcut.unregisterAll());
+  app.on('window-all-closed', (e) => e.preventDefault());
+  // Sair no meio da gravação fecha o arquivo antes, para não perder o último pedaço.
+  app.on('before-quit', (e) => {
+    if (estado === 'parado') return;
+    e.preventDefault();
+    saindo = true;
+    if (estado === 'gravando') alternar();
   });
-  session.defaultSession.setPermissionRequestHandler((_wc, _perm, ok) => ok(true));
+  if (process.platform === 'darwin') app.dock?.hide();
 
-  if (process.platform === 'darwin') await systemPreferences.askForMediaAccess('microphone');
+  app.whenReady().then(async () => {
+    fs.mkdirSync(pasta, { recursive: true });
 
-  janela = new BrowserWindow({
-    show: false,
-    webPreferences: { preload: path.join(__dirname, 'preload.js'), backgroundThrottling: false },
+    // A captura vai sem seletor: a tela principal inteira, com o áudio do sistema por loopback.
+    session.defaultSession.setDisplayMediaRequestHandler(async (_req, callback) => {
+      try {
+        const [tela] = await desktopCapturer.getSources({ types: ['screen'] });
+        if (!tela) return callback({});
+        // Loopback só existe no Windows e no Mac; no Linux o áudio do sistema vem do monitor (ver gravador.js).
+        callback(process.platform === 'linux' ? { video: tela } : { video: tela, audio: 'loopback' });
+      } catch (e) {
+        console.error('Sem acesso à tela:', e.message);
+        callback({});
+      }
+    });
+    session.defaultSession.setPermissionRequestHandler((_wc, _perm, ok) => ok(true));
+
+    if (process.platform === 'darwin') await systemPreferences.askForMediaAccess('microphone');
+
+    janela = new BrowserWindow({
+      show: false,
+      webPreferences: { preload: path.join(__dirname, 'preload.js'), backgroundThrottling: false },
+    });
+    janela.loadFile(path.join(__dirname, 'gravador.html'));
+    janela.webContents.on('console-message', (e) => console.log('[gravador]', e.message));
+
+    tray = new Tray(icone(false));
+    // No Mac o clique abre o menu; no Windows e no Linux o clique grava e o botão direito abre o menu.
+    if (process.platform !== 'darwin') tray.on('click', alternar);
+    atualizarTray();
+
+    if (!globalShortcut.register(ATALHO, alternar)) avisar(`Atalho ${ATALHO} já está em uso por outro app.`);
+    if (process.argv.includes('--alternar')) janela.webContents.once('did-finish-load', alternar);
   });
-  janela.loadFile(path.join(__dirname, 'gravador.html'));
-  janela.webContents.on('console-message', (e) => console.log('[gravador]', e.message));
-
-  tray = new Tray(icone(false));
-  atualizarTray();
-
-  if (!globalShortcut.register(ATALHO, alternar)) avisar(`Atalho ${ATALHO} já está em uso por outro app.`);
-  if (process.argv.includes('--alternar')) janela.webContents.once('did-finish-load', alternar);
-});
-
-app.on('will-quit', () => globalShortcut.unregisterAll());
-app.on('window-all-closed', (e) => e.preventDefault());
+}
 
 function alternar() {
-  janela.webContents.send(gravando ? 'parar' : 'iniciar');
+  if (!janela) return;
+  if (estado === 'parado') {
+    estado = 'iniciando';
+    janela.webContents.send('iniciar');
+  } else if (estado === 'gravando') {
+    estado = 'parando';
+    janela.webContents.send('parar');
+  }
+  atualizarTray();
 }
 
 ipcMain.on('iniciou', (_e, mime) => {
   caminhoAtual = path.join(pasta, nomeDoArquivo(new Date(), extensaoDoMime(mime)));
   arquivo = fs.createWriteStream(caminhoAtual);
-  gravando = true;
+  estado = 'gravando';
   atualizarTray();
+  if (saindo) alternar();
 });
 
 // Cada pedaço vai direto para o disco, então uma queda no meio da reunião não perde o que já foi gravado.
 ipcMain.on('pedaco', (_e, dados) => arquivo?.write(Buffer.from(dados)));
 
-ipcMain.on('terminou', () => {
-  const salvo = caminhoAtual;
-  arquivo?.end(() => avisar(`Gravação salva em ${salvo}`, salvo));
-  arquivo = null;
-  gravando = false;
-  atualizarTray();
-});
+ipcMain.on('terminou', () => fechar((salvo) => avisar(`Gravação salva em ${salvo}`, salvo)));
 
-ipcMain.on('falhou', (_e, msg) => {
-  gravando = false;
-  atualizarTray();
-  avisar(`Não deu para gravar: ${msg}`);
-});
+ipcMain.on('falhou', (_e, msg) => fechar(() => avisar(`Não deu para gravar: ${msg}`)));
+
+function fechar(depois) {
+  const salvo = caminhoAtual;
+  const concluir = () => {
+    estado = 'parado';
+    atualizarTray();
+    depois(salvo);
+    if (saindo) app.quit();
+  };
+  if (arquivo) arquivo.end(concluir);
+  else concluir();
+  arquivo = null;
+}
 
 function atualizarTray() {
-  tray.setImage(icone(gravando));
-  tray.setToolTip(gravando ? 'Gravando reunião' : 'Gravador de reuniões');
+  if (!tray) return;
+  const ativo = estado !== 'parado';
+  tray.setImage(icone(ativo));
+  tray.setToolTip(ativo ? 'Gravando reunião' : 'Gravador de reuniões');
   tray.setContextMenu(Menu.buildFromTemplate([
-    { label: gravando ? 'Parar gravação' : 'Gravar tela', accelerator: ATALHO, click: alternar },
+    { label: ativo ? 'Parar gravação' : 'Gravar tela', accelerator: ATALHO, click: alternar, enabled: estado === 'parado' || estado === 'gravando' },
     { label: 'Abrir pasta das gravações', click: () => shell.openPath(pasta) },
     { type: 'separator' },
-    { label: 'Iniciar com o sistema', type: 'checkbox', checked: app.getLoginItemSettings().openAtLogin,
-      click: (item) => app.setLoginItemSettings({ openAtLogin: item.checked }) },
+    // shortcut: o Electron não tem "abrir com o sistema" no Linux; lá o item some até alguém pedir o .desktop de autostart.
+    ...(process.platform === 'linux' ? [] : [{
+      label: 'Iniciar com o sistema', type: 'checkbox', checked: app.getLoginItemSettings().openAtLogin,
+      click: (item) => app.setLoginItemSettings({ openAtLogin: item.checked }),
+    }]),
     { label: 'Sair', click: () => app.quit() },
   ]));
 }

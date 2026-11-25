@@ -1,5 +1,6 @@
 // Roda numa janela oculta: captura a tela com o áudio do sistema, soma o microfone e grava.
-const FORMATOS = ['video/mp4;codecs=avc1,mp4a.40.2', 'video/webm;codecs=vp9,opus', 'video/webm'];
+// MP4 primeiro: abre e avança em qualquer player. No Linux o Chromium não tem H.264, mas grava VP9 em MP4.
+const FORMATOS = ['video/mp4;codecs=avc1,mp4a.40.2', 'video/mp4;codecs=vp9,opus', 'video/webm;codecs=vp9,opus', 'video/webm'];
 
 let gravador, faixas = [], contexto;
 // Os pedaços vão em fila: arrayBuffer() é assíncrono, e sem a fila o último chegaria depois do onstop e se perderia.
@@ -24,7 +25,10 @@ window.ponte.aoIniciar(async () => {
       const dispositivos = await navigator.mediaDevices.enumerateDevices();
       const saidaDoSistema = dispositivos.find((d) => d.kind === 'audioinput' && /monitor/i.test(d.label));
       if (saidaDoSistema) {
-        monitor = await navigator.mediaDevices.getUserMedia({ audio: { deviceId: { exact: saidaDoSistema.deviceId } } });
+        // Sem o processamento de voz: no áudio do sistema ele abafa a reunião e o cancelamento de eco come a própria saída.
+        monitor = await navigator.mediaDevices.getUserMedia({
+          audio: { deviceId: { exact: saidaDoSistema.deviceId }, echoCancellation: false, noiseSuppression: false, autoGainControl: false },
+        });
         faixas.push(...monitor.getTracks());
       } else {
         console.warn('Sem áudio do sistema nesta plataforma.');
