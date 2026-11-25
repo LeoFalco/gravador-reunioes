@@ -40,7 +40,7 @@ const gravacoes = () => pastas.flatMap((p) => (fs.existsSync(p) ? fs.readdirSync
     const { stderr } = spawnSync('ffmpeg', ['-i', arquivo, '-vn', '-af', 'volumedetect', '-f', 'null', '-'], { encoding: 'utf8' });
     const media = Number(/mean_volume: (-?[\d.]+) dB/.exec(stderr)?.[1]);
     console.log(`Volume médio: ${media} dB`);
-    if (!(media > -50)) throw new Error(`Áudio do sistema não entrou (volume médio ${media} dB)`);
+    if (!(media > -35)) throw new Error(`Áudio do sistema não entrou (volume médio ${media} dB)`);
   }
   process.exit(0);
 })().catch((e) => { console.error(e.message); process.exit(1); });

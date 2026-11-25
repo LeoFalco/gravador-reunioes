@@ -8,7 +8,11 @@ let fila = Promise.resolve();
 
 window.ponte.aoIniciar(async () => {
   try {
-    const tela = await navigator.mediaDevices.getDisplayMedia({ video: { frameRate: 30 }, audio: true });
+    // Sem processamento de voz no áudio do sistema: o ganho automático do Chromium o deixava a -44 dB no Linux.
+    const tela = await navigator.mediaDevices.getDisplayMedia({
+      video: { frameRate: 30 },
+      audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false },
+    });
     faixas.push(...tela.getTracks());
 
     let mic = null;
@@ -19,26 +23,12 @@ window.ponte.aoIniciar(async () => {
       console.warn('Sem microfone, segue só com o áudio do sistema:', e.message);
     }
 
-    // No Linux o Chromium não entrega o loopback; o áudio do sistema sai do "Monitor of ..." do PulseAudio/PipeWire.
-    let monitor = null;
-    if (!tela.getAudioTracks().length) {
-      const dispositivos = await navigator.mediaDevices.enumerateDevices();
-      const saidaDoSistema = dispositivos.find((d) => d.kind === 'audioinput' && /monitor/i.test(d.label));
-      if (saidaDoSistema) {
-        // Sem o processamento de voz: no áudio do sistema ele abafa a reunião e o cancelamento de eco come a própria saída.
-        monitor = await navigator.mediaDevices.getUserMedia({
-          audio: { deviceId: { exact: saidaDoSistema.deviceId }, echoCancellation: false, noiseSuppression: false, autoGainControl: false },
-        });
-        faixas.push(...monitor.getTracks());
-      } else {
-        console.warn('Sem áudio do sistema; entradas vistas:', JSON.stringify(dispositivos.map((d) => `${d.kind}:${d.label}`)));
-      }
-    }
+    if (!tela.getAudioTracks().length) console.warn('Sem áudio do sistema; segue só com o microfone.');
 
     // MediaRecorder grava uma faixa de áudio só, então sistema e microfone se misturam aqui.
     contexto = new AudioContext();
     const destino = contexto.createMediaStreamDestination();
-    for (const fonte of [tela, monitor, mic]) {
+    for (const fonte of [tela, mic]) {
       if (fonte?.getAudioTracks().length) contexto.createMediaStreamSource(fonte).connect(destino);
     }
 

@@ -40,7 +40,7 @@ por script ou por outro atalho.
   Segurança e abra de novo. O app não é assinado pela Apple; o instalador assina localmente, e por
   isso cada atualização pode pedir a permissão outra vez.
 - **Windows**: nada a configurar.
-- **Linux**: o áudio do sistema vem do "Monitor" do PulseAudio ou PipeWire. Em Wayland o sistema
+- **Linux**: o áudio do sistema vem da saída padrão do PulseAudio ou do PipeWire. Em Wayland o sistema
   mostra o seletor de tela a cada gravação, e o atalho global depende do portal do ambiente; se ele
   não pegar, crie um atalho do sistema que rode `~/.local/bin/gravador-reunioes.AppImage --alternar`.
   O AppImage precisa do `libfuse2` (`libfuse2t64` no Ubuntu 24.04).
