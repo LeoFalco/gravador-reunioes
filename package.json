@@ -1,6 +1,6 @@
 {
   "name": "gravador-reunioes",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Grava a tela com o áudio da reunião e o microfone, pela bandeja e por atalho.",
   "main": "src/main.js",
   "scripts": {

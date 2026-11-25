@@ -56,7 +56,6 @@ function iniciar() {
     });
     session.defaultSession.setPermissionRequestHandler((_wc, _perm, ok) => ok(true));
 
-    if (process.platform === 'darwin') await systemPreferences.askForMediaAccess('microphone');
 
     janela = new BrowserWindow({
       show: false,
@@ -69,6 +68,9 @@ function iniciar() {
     // No Mac o clique abre o menu; no Windows e no Linux o clique grava e o botão direito abre o menu.
     if (process.platform !== 'darwin') tray.on('click', alternar);
     atualizarTray();
+
+    // Sem await: na primeira abertura o pedido do microfone fica na tela, e o app precisa já estar de pé.
+    if (process.platform === 'darwin') systemPreferences.askForMediaAccess('microphone');
 
     if (!globalShortcut.register(ATALHO, alternar)) avisar(`Atalho ${ATALHO} já está em uso por outro app.`);
     if (process.argv.includes('--alternar')) janela.webContents.once('did-finish-load', alternar);
@@ -134,10 +136,11 @@ function atualizarTray() {
 }
 
 function icone(ativo) {
-  if (ativo) return nativeImage.createFromPath(path.join(__dirname, 'gravando.png'));
-  // No Mac o ícone é template (segue o tema da barra); no Windows e no Linux um anel preto some na barra escura.
-  if (process.platform !== 'darwin') return nativeImage.createFromPath(path.join(__dirname, '..', 'icone.png')).resize({ width: 16 });
-  const img = nativeImage.createFromPath(path.join(__dirname, 'parado.png'));
+  if (ativo) return nativeImage.createFromPath(path.join(__dirname, 'bandeja-gravando.png'));
+  // No Mac o ícone parado é template (o sistema pinta conforme o tema); no Windows e no Linux vai o
+  // ícone do app em miniatura, que aparece em barra clara e escura.
+  if (process.platform !== 'darwin') return nativeImage.createFromPath(path.join(__dirname, 'bandeja-cor.png')).resize({ width: 16 });
+  const img = nativeImage.createFromPath(path.join(__dirname, 'bandeja.png'));
   img.setTemplateImage(true);
   return img;
 }
