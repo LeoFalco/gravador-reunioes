@@ -41,8 +41,9 @@ jobs:
           export PULSE_SERVER="$(pactl info | sed -n 's/^Server String: //p')"
           pactl info | grep -E "Server String|Default"
           pactl list short sources
+          ldconfig -p | grep -E "libpulse|libasound" || true
           (ffmpeg -loglevel error -re -f lavfi -i sine=frequency=440:duration=60 -f pulse default &)
-          EXIGIR_AUDIO=1 xvfb-run -a -s "-screen 0 1280x720x24" node scripts/fumaca.js dist/linux-unpacked/gravador-reunioes --no-sandbox
+          EXIGIR_AUDIO=1 xvfb-run -a -s "-screen 0 1280x720x24" node scripts/fumaca.js dist/linux-unpacked/gravador-reunioes --no-sandbox --enable-logging=stderr --vmodule=*audio*=2,*pulse*=3,*alsa*=2
       - name: Fumaça no Windows
         if: runner.os == 'Windows'
         shell: bash
