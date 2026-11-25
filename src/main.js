@@ -47,8 +47,8 @@ function iniciar() {
       try {
         const [tela] = await desktopCapturer.getSources({ types: ['screen'] });
         if (!tela) return callback({});
-        // Loopback só existe no Windows e no Mac; no Linux o áudio do sistema vem do monitor (ver gravador.js).
-        callback(process.platform === 'linux' ? { video: tela } : { video: tela, audio: 'loopback' });
+        // No Linux o loopback do Chromium lê o monitor da saída padrão do PulseAudio/PipeWire.
+        callback({ video: tela, audio: 'loopback' });
       } catch (e) {
         console.error('Sem acesso à tela:', e.message);
         callback({});
