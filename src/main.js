@@ -57,13 +57,6 @@ function iniciar() {
     session.defaultSession.setPermissionRequestHandler((_wc, _perm, ok) => ok(true));
 
 
-    janela = new BrowserWindow({
-      show: false,
-      webPreferences: { preload: path.join(__dirname, 'preload.js'), backgroundThrottling: false },
-    });
-    janela.loadFile(path.join(__dirname, 'gravador.html'));
-    janela.webContents.on('console-message', (e) => console.log('[gravador]', e.message));
-
     tray = new Tray(icone(false));
     // No Mac o clique abre o menu; no Windows e no Linux o clique grava e o botão direito abre o menu.
     if (process.platform !== 'darwin') tray.on('click', alternar);
@@ -73,15 +66,26 @@ function iniciar() {
     if (process.platform === 'darwin') systemPreferences.askForMediaAccess('microphone');
 
     if (!globalShortcut.register(ATALHO, alternar)) avisar(`Atalho ${ATALHO} já está em uso por outro app.`);
-    if (process.argv.includes('--alternar')) janela.webContents.once('did-finish-load', alternar);
+    if (process.argv.includes('--alternar')) alternar();
   });
 }
 
+// A janela oculta que grava só existe durante a gravação: parado, o app não mantém um renderer aberto.
+function abrirJanela() {
+  janela = new BrowserWindow({
+    show: false,
+    webPreferences: { preload: path.join(__dirname, 'preload.js'), backgroundThrottling: false },
+  });
+  janela.webContents.on('console-message', (e) => console.log('[gravador]', e.message));
+  // Se o renderer cair no meio, o que já foi para o disco fica, e o arquivo fecha direito.
+  janela.webContents.on('render-process-gone', (_e, d) => estado !== 'parado' && fechar(() => avisar(`A gravação parou: ${d.reason}`)));
+  return janela.loadFile(path.join(__dirname, 'gravador.html'));
+}
+
 function alternar() {
-  if (!janela) return;
   if (estado === 'parado') {
     estado = 'iniciando';
-    janela.webContents.send('iniciar');
+    abrirJanela().then(() => janela.webContents.send('iniciar'));
   } else if (estado === 'gravando') {
     estado = 'parando';
     janela.webContents.send('parar');
@@ -115,6 +119,8 @@ ipcMain.on('falhou', (_e, msg) => fechar(() => {
 function fechar(depois) {
   const salvo = caminhoAtual;
   const concluir = () => {
+    janela?.destroy();
+    janela = null;
     estado = 'parado';
     atualizarTray();
     depois(salvo);

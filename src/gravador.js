@@ -8,7 +8,8 @@ let fila = Promise.resolve();
 
 window.ponte.aoIniciar(async () => {
   try {
-    const video = { frameRate: 30 };
+    // 15 fps basta para slide, tela compartilhada e rosto; metade dos quadros, metade do arquivo.
+    const video = { frameRate: 15 };
     // No Linux o ganho automático do Chromium deixava o áudio do sistema a -44 dB. Só lá ele sai: no
     // Windows, o loopback com o processamento desligado não abriu no runner do CI.
     const audio = window.ponte.plataforma === 'linux' ? { echoCancellation: false, noiseSuppression: false, autoGainControl: false } : true;
@@ -40,7 +41,7 @@ window.ponte.aoIniciar(async () => {
 
     const saida = new MediaStream([...tela.getVideoTracks(), ...destino.stream.getAudioTracks()]);
     const mime = FORMATOS.find((f) => MediaRecorder.isTypeSupported(f));
-    gravador = new MediaRecorder(saida, { mimeType: mime, videoBitsPerSecond: 2_500_000 });
+    gravador = new MediaRecorder(saida, { mimeType: mime, videoBitsPerSecond: 1_200_000 });
     gravador.ondataavailable = (e) => {
       if (e.data.size) fila = fila.then(async () => window.ponte.pedaco(await e.data.arrayBuffer()));
     };
