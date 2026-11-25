@@ -8,11 +8,17 @@ let fila = Promise.resolve();
 
 window.ponte.aoIniciar(async () => {
   try {
-    // Sem processamento de voz no áudio do sistema: o ganho automático do Chromium o deixava a -44 dB no Linux.
-    const tela = await navigator.mediaDevices.getDisplayMedia({
-      video: { frameRate: 30 },
-      audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false },
-    });
+    const video = { frameRate: 30 };
+    // No Linux o ganho automático do Chromium deixava o áudio do sistema a -44 dB. Só lá ele sai: no
+    // Windows, o loopback com o processamento desligado não abriu no runner do CI.
+    const audio = window.ponte.plataforma === 'linux' ? { echoCancellation: false, noiseSuppression: false, autoGainControl: false } : true;
+    const tela = await navigator.mediaDevices
+      .getDisplayMedia({ video, audio })
+      // Sem dispositivo de saída o loopback não abre; melhor gravar a tela e o microfone do que nada.
+      .catch((e) => {
+        console.warn('Áudio do sistema indisponível:', e.message);
+        return navigator.mediaDevices.getDisplayMedia({ video, audio: false });
+      });
     faixas.push(...tela.getTracks());
 
     let mic = null;
