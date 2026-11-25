@@ -31,7 +31,7 @@ window.ponte.aoIniciar(async () => {
         });
         faixas.push(...monitor.getTracks());
       } else {
-        console.warn('Sem áudio do sistema nesta plataforma.');
+        console.warn('Sem áudio do sistema; entradas vistas:', JSON.stringify(dispositivos.map((d) => `${d.kind}:${d.label}`)));
       }
     }
 
